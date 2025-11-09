@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>○×問題アプリ（内蔵・即採点・マーク“トグル”版）</title>
+  <style>
+    :root{--bg:#f7f7f8;--card:#fff;--ink:#111;--muted:#666;--accent:#2563eb;--ok:#10b981;--ng:#ef4444;--sel:#e5e7eb}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif}
+    header{position:sticky;top:0;background:var(--card);border-bottom:1px solid #e5e7eb}
+    header .bar{max-width:840px;margin:0 auto;padding:.8rem .9rem;display:flex;gap:.75rem;align-items:center}
+    main{max-width:840px;margin:0 auto;padding:1rem .9rem 2rem}
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+    .pad{padding:1rem} .row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+    .pill{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .6rem;border:1px solid #e5e7eb;border-radius:999px;background:#fff}
+    .btn{appearance:none;border:1px solid #d1d5db;background:#fff;color:#111;padding:.6rem .9rem;border-radius:12px;font-weight:700;cursor:pointer}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .btn.choice{background:#fff;color:#111}
+    .btn.choice.selected{background:var(--sel);color:#111}
+    .btn.marked{background:var(--sel);color:#111} /* マークON時の見た目 */ 
+    .qtext{font-size:1.1rem;white-space:pre-wrap} .muted{color:var(--muted)}
+    .result{font-weight:800} .result.ok{color:var(--ok)} .result.ng{color:var(--ng)}
+    .progress{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden} .progress>i{display:block;height:100%;background:var(--accent);width:0}
+  </style>
+</head>
+<body>
+  <header><div class="bar">
+    <h1 style="font-size:1.05rem;margin:0">○×問題アプリ（内蔵・即採点）</h1>
+    <div style="margin-left:auto" class="pill">総問題数: <b id="len">0</b></div>
+    <button id="btnStart" class="btn primary">開始</button>
+  </div></header>
+
+  <main>
+    <section id="setup" class="card pad">
+      <div class="row">
+        <label class="pill"><input type="checkbox" id="optShuffle"> シャッフル</label>
+        <label class="pill"><input type="checkbox" id="optWrongOnly"> 間違えた問題のみ</label>
+        <button class="btn" id="btnClear">履歴クリア</button>
+      </div>
+      <p class="muted" style="margin:.2rem 0 0">○/× を押した瞬間に正誤と解説が表示されます。「間違えた扱いにする」はトグル（ON/OFF）です。</p>
+    </section>
+
+    <section id="quiz" class="card pad" style="display:none">
+      <div class="row" style="gap:1rem;align-items:center">
+        <div class="pill">問題 <b id="idx">1</b>/<b id="total">0</b></div>
+        <div class="pill">正解 <b id="ok">0</b></div>
+        <div class="pill">不正解 <b id="ng">0</b></div>
+        <button class="btn" id="btnExit" style="margin-left:auto">終了</button>
+      </div>
+      <div class="progress"><i id="bar"></i></div>
+
+      <div class="qtext" id="qtext" style="margin:.6rem 0 .4rem"></div>
+
+      <div class="row" id="choices" style="justify-content:center;margin:.4rem 0 .2rem">
+        <button class="btn choice" id="btnTrue">○ 正しい</button>
+        <button class="btn choice" id="btnFalse">× 誤り</button>
+      </div>
+
+      <div class="result" id="result" style="display:none"></div>
+      <div id="explainWrap" class="muted" style="display:none; margin-top:.5rem"></div>
+
+      <div class="row" style="justify-content:space-between;margin-top:.6rem">
+        <button class="btn" id="btnPrev">← 前</button>
+        <div class="row" style="gap:.5rem">
+          <button class="btn" id="btnMarkWrong">間違えた扱いにする</button>
+          <button class="btn" id="btnNext">次 →</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const DATA = [{"id": 1, "text": "指定都市が処理する事務は、自治事務と法定受託事務とに区分されており、自治事務の例としては飲食店営業の許可事務があり、法定受託事務の例としては都市計画の決定事務がある。", "answer": false, "explain": "自治事務と法定受託事務\n○自治事務\n・都市計画の決定事務\n・土地改良区の設定認可事務\n・飲食店営業の許可事務\n○法定受託事務\n・都道府県の議会の議員または長の選挙など\n\n⇒いずれの事務に関しても、条例を制定することができる。\n議会は、いずれの事務の管理についても、検査することが認められている。"}, {"id": 2, "text": "指定都市の議会に議会運営委員会を置く条例の提案権は、当該指定都市の議会の議員のみが有するのに対し、指定都市の議会に事務局を置く条例の提案権については、当該指定都市の長のみが有する。", "answer": false, "explain": "長と議員の権利\n・長の直近下位の内部組織、支所、出張所を設ける条例→長\n・条例の提案権→長と議員両方\n・常任委員会、議会運営委員会、特別委員会を置く条例→議員\n・議会に事務局を置く→議員"}, {"id": 3, "text": "指定都市の条例の公布に関し必要な事項については、条例で定めなければならず、市長の定める規則の公布に関し必要な事項については、市長の定める規則で定めなければならない。", "answer": false, "explain": "・指定都市の条例の交付に関し、必要な事項は条例で定める。\n・市長の定める規則の交付関しては、市長の定める条例で定める。"}, {"id": 4, "text": "指定都市の執行機関としての委員会のうち、教育委員会及び人事委員会のいずれも、法律の定めるところにより、法令又は当該指定都市の条例若しくは規則に違反しない限りにおいて、その権限に属する事務に関して規則を定めることが認められている。", "answer": true, "explain": "教育委員会、人事委員会及び公平委員会いずれもその権限に属する事務に関して、規則を定めることができる"}, {"id": 5, "text": "指定都市の長は、条例の制定についての議会の議決があり、議長から当該条例の送付を受けた場合において、再議その他の措置を講じる必要がないと認めるときは、20日以内に当該条例を公布しなければならず、当該条例は、公布されるまではその効力を生じない。", "answer": true, "explain": "長は議長から、条例の送付を受けた時、再議の必要がないときは、20日以内に条例を公布しなければならない。条例は交付されるまで効力を生じない。"}, {"id": 6, "text": "指定都市の長の直近下位の内部組織を設ける条例の議案提出権については、当該指定都市の長のみがこれを有するのに対し、指定都市の議会に事務局を置く条例の議案提出権については、当該指定都市の議会の議員のみがこれを有する。", "answer": true, "explain": "長と議員の権利\n・長の直近下位の内部組織、支所、出張所を設ける条例→長\n・条例の提案権→長と議員両方\n・常任委員会、議会運営委員会、特別委員会を置く条例→議員\n・議会に事務局を置く→議員"}, {"id": 7, "text": "指定都市の条例には、法令に特別の定めがあるものを除き、当該条例に違反した者に対して罰金の刑を科する旨の規定を設けることが認められているが、当該条例に違反した者に対して懲役の刑を科する旨の規定を設けることは認められていない。", "answer": false, "explain": "条例に違反した者には、罰金、懲役、拘留、過料の刑を科すことが認められている。"}, {"id": 8, "text": "指定都市が処理する事務は、自治事務と法定受託事務とに区分されており、指定都市は、法令に違反しない限りにおいて、自治事務及び法定受託事務のいずれの事務に関しても、条例を制定することができる。", "answer": true, "explain": "自治事務と法定受託事務\n○自治事務\n・都市計画の決定事務\n・土地改良区の設定認可事務\n・飲食店営業の許可事務\n○法定受託事務\n・都道府県の議会の議員または長の選挙など\n\n⇒いずれの事務に関しても、条例を制定することができる。\n議会は、いずれの事務の管理についても、検査することが認められている。"}, {"id": 9, "text": "指定都市における長の直近下位の内部組織を設ける条例の発案権については、当該指定都市の長のみがこれを有するのに対し、指定都市の議会に特別委員会を置く条例の発案権については、当該指定都市の議会の議員のみがこれを有する。", "answer": true, "explain": "長と議員の権利\n・長の直近下位の内部組織、支所、出張所を設ける条例→長\n・条例の提案権→長と議員両方\n・常任委員会、議会運営委員会、特別委員会を置く条例→議員\n・議会に事務局を置く→議員"}, {"id": 10, "text": "指定都市の執行機関としての委員会のうち、教育委員会は法律の定めるところにより、法令又は当該指定都市の条例若しくは規則に違反しない限りにおいて、その権限に属する事務に関して規則を定めることが認められている。", "answer": true, "explain": "教育委員会、人事委員会及び公平委員会いずれもその権限に属する事務に関して、規則を定めることができる"}, {"id": 11, "text": "指定都市の長が定める規則には、法令に特別な定めがあるものを除くほか、規則に違反した者に対して、５万円以下の過料を科する旨の規定を設けることが認められている。", "answer": true, "explain": "長は規則に違反した者に、5万円以下の過料を科すことができる"}, {"id": 12, "text": "指定都市は、法令に特別の定めがあるものを除くほか、条例中に、当該条例に違反した者に対し罰金の刑を科する旨の規定を設けること、及び当該条例に違反した者に対し過料を科する旨の規定を設けることのいずれも認められている。", "answer": true, "explain": "条例に違反した者には、罰金、懲役、拘留、過料の刑を科すことが認められている。"}, {"id": 13, "text": "議会に特別委員会を置く条例の発案権については、議会の議員のみがこれを有するのに対し、議会に事務局を置く条例の発案権については、議会の議員及び市長のいずれもこれを有する。", "answer": false, "explain": "長と議員の権利\n・長の直近下位の内部組織、支所、出張所を設ける条例→長\n・条例の提案権→長と議員両方\n・常任委員会、議会運営委員会、特別委員会を置く条例→議員\n・議会に事務局を置く→議員"}, {"id": 14, "text": "市町村長の定める規則は、当該市町村の区域内でのみその効力を有することとされており、いかなる場合も、当該市町村の区域外においてその効力を有することはない。", "answer": false, "explain": "市長の規則は、市町村の区域外でも有効。\nまた、当該区域内の住民、滞在者、公の施設を利用する他の団体にも効力が及ぶ"}, {"id": 15, "text": "市町村の議会に常任委員会を置く条例の発案権については、当該市町村の長及び議会の議員のいずれもこれを有することとされている。", "answer": false, "explain": "長と議員の権利\n・長の直近下位の内部組織、支所、出張所を設ける条例→長\n・条例の提案権→長と議員両方\n・常任委員会、議会運営委員会、特別委員会を置く条例→議員\n・議会に事務局を置く→議員"}, {"id": 16, "text": "市町村が処理する事務のうち、自治事務に関しては、法令に違反しない限りにおいて条例を制定することができるのに対し、法定受託事務に関しては、いかなる場合も条例を制定することができない。", "answer": false, "explain": "自治事務と法定受託事務\n○自治事務\n・都市計画の決定事務\n・土地改良区の設定認可事務\n・飲食店営業の許可事務\n○法定受託事務\n・都道府県の議会の議員または長の選挙など\n\n⇒いずれの事務に関しても、条例を制定することができる。\n議会は、いずれの事務の管理についても、検査することが認められている。"}, {"id": 17, "text": "市町村の条例には、法令に特別の定めがあるものを除き、当該条例に違反した者に対して罰金の刑を科する旨の規定を設けることが認められているが、当該条例に違反した者に対して懲役の刑を科する旨の規定を設けることは認められていない。", "answer": false, "explain": "条例に違反した者には、罰金、懲役、拘留、過料の刑を科すことが認められている。"}, {"id": 18, "text": "市町村は、法令に特別の定めがあるものを除き、条例中に、当該条例に違反した者に対し罰金の刑を科する旨の規定を設けることができるが、当該条例に違反した者に対し懲役の刑を科する旨の規定を設けることはできない。", "answer": false, "explain": "条例に違反した者には、罰金、懲役、拘留、過料の刑を科すことが認められている。"}, {"id": 19, "text": "市町村の執行機関としての委員会のうち、人事委員会及び公平委員会のいずれも、法令又は当該市町村の条例若しくは規則に違反しない限りにおいて、その権限に属する事務に関し、規則を定めることができる。", "answer": true, "explain": "教育委員会、人事委員会及び公平委員会いずれもその権限に属する事務に関して、規則を定めることができる"}, {"id": 20, "text": "市町村長の直近下位の内部組織を設置する条例の提案権については、当該市町村長のみがこれを有するのに対し、市町村の議会に事務局を設置する条例の提案権については、当該議会の議員のみがこれを有する。", "answer": true, "explain": "長と議員の権利\n・長の直近下位の内部組織、支所、出張所を設ける条例→長\n・条例の提案権→長と議員両方\n・常任委員会、議会運営委員会、特別委員会を置く条例→議員\n・議会に事務局を置く→議員"}, {"id": 21, "text": "市町村の条例は、原則として当該市町村の区域内でのみその効力を有するが、市町村が当該市町村の区域外に公の施設を設けた場合、その限りにおいて当該市町村の区域外においてもその効力を有する。", "answer": true, "explain": "市長の規則は、市町村の区域外でも有効。\nまた、当該区域内の住民、滞在者、公の施設を利用する他の団体にも効力が及ぶ"}, {"id": 22, "text": "指定都市の条例は、公布されるまでの間はその効力を生じないものとされており、いかなる場合も、当該条例をさかのぼって適用することは認められていない。", "answer": false, "explain": "条例、規則を遡って適用すると定めた時は、条例を遡って適用する。"}, {"id": 23, "text": "規則をさかのぼって施行することはできないが、規則中に住民に利益を及ぼす内容を有する規定を設ける場合、当該規定については、当該規則で特にさかのぼってこれを適用すると定めたときに限り、遡及的効力を有することとされている。", "answer": true, "explain": "条例、規則を遡って適用すると定めた時は、条例を遡って適用する。"}, {"id": 24, "text": "条例には、法令に特別の定めがあるものを除いて、当該条例に違反した者に対して過料を科する旨の規定を設けることができるが、規則には、いかなる場合も当該規則に違反した者に対して過料を科する旨の規定を設けることはできない。", "answer": false, "explain": "規則に違反した者に、過料を科すことはできる。"}, {"id": 25, "text": "指定都市の執行機関としての委員会のうち、人事委員会及び教育委員会のいずれも、法律の定めるところにより、法令、条例及び規則に違反しない限りにおいて、それぞれの権限に属する事務に関し規則を定めることが認められている。", "answer": true, "explain": "教育委員会、人事委員会及び公平委員会いずれもその権限に属する事務に関して、規則を定めることができる"}, {"id": 26, "text": "市町村の議会の議長は、条例の制定の議決があったときは、これを一定期間内に当該市町村の長に送付することが義務付けられており、当該条例の送付を受けた市町村の長は、再議その他の措置を講ずる必要がないと認めるときは、一定期間内に当該条例を公布することが義務付けられている。", "answer": true, "explain": "長は議長から、条例の送付を受けた時、再議の必要がないときは、20日以内に条例を公布しなければならない。条例は交付されるまで効力を生じない。"}, {"id": 27, "text": "市町村は、法令に違反しない限りにおいて、自治事務及び法定受託事務のいずれの事務についても、条例を制定することが認められており、市町村の議会は、一定の場合を除き、自治事務の管理及び法定受託事務の管理のいずれについても、これを検査することが認められている。", "answer": true, "explain": "自治事務と法定受託事務\n○自治事務\n・都市計画の決定事務\n・土地改良区の設定認可事務\n・飲食店営業の許可事務\n○法定受託事務\n・都道府県の議会の議員または長の選挙など\n\n⇒いずれの事務に関しても、条例を制定することができる。\n議会は、いずれの事務の管理についても、検査することが認められている。"}, {"id": 28, "text": "市町村の議会に常任委員会を置く条例案の提出権については、議会の議員のみがこれを有するのに対し、市町村の支所又は出張所を設ける条例案の提出権については、市町村の長のみがこれを有する。", "answer": true, "explain": "長と議員の権利\n・長の直近下位の内部組織、支所、出張所を設ける条例→長\n・条例の提案権→長と議員両方\n・常任委員会、議会運営委員会、特別委員会を置く条例→議員\n・議会に事務局を置く→議員"}, {"id": 29, "text": "指定都市の長は、規則案が新たに予算を伴うこととなるものであるときは、必要な予算上の措置が適確に講ぜられる見込みが得られれば、当該規則を制定することができる。", "answer": false, "explain": "予算の見込みでは、規則を制定することはできない。"}, {"id": 30, "text": "教育委員会は、その権限に属する事務に関する規則を改正しようとする場合において、当該規則の改正があらたに予算を伴うこととなるものであるときは、必要な予算上の措置が適確に講ぜられることとなるまでの間は、これを改正することは認められていない。", "answer": true, "explain": "予算の見込みでは、規則を制定することはできない。"}, {"id": 31, "text": "議長及び副議長のいずれについても、議会が議員の中からこれを選挙することとされている。", "answer": true, "explain": "議長、副議長とも議員の中から選挙する"}, {"id": 32, "text": "地方自治法上、議会には常任委員会を置くことが義務づけられており、議員は少なくとも一の常任委員となるものとされている。", "answer": false, "explain": "議会は、常任委員会、議会運営委員会、特別委員会を置くことができる。"}, {"id": 33, "text": "議長については、議会が議員の中からこれを選挙することとされているのに対し、副議長については、議長が議員の中からこれを選任することとされている。", "answer": false, "explain": "議長、副議長とも議員の中から選挙する"}, {"id": 34, "text": "常任委員会は、議会の閉会中において議会の議決により付議された特定の事件を継続して審査することが認められているのに対し、特別委員会は、議会の閉会中において議会の議決により付議された特定の事件を継続して審査することが認められていない。", "answer": false, "explain": "委員会（常任、特別、議会運営）は、議会の閉会中も特定の事件を継続して審査できる。"}, {"id": 35, "text": "議会の議員は、地方自治法の規定により、主として当該市町村に対し請負をする法人の取締役となることが禁止されており、この規定に該当したときは、議員の職を失うこととされている。", "answer": true, "explain": "議員は当該市町村に対し、請負をする法人の取締役となることが禁止されている。\n該当したときは議員の職を失う。\n他の指定都市に対し、請負をすること、及び取締役となることは禁止されていない。"}, {"id": 36, "text": "副議長は、その職を辞する場合、議会の開会中であれば議会の許可を得ることとされており、議会の閉会中であれば議長の許可を得ることとされている。", "answer": true, "explain": "副議長が辞める時\n議会開会中⇒議会の許可\n議会閉会中⇒議長の許可\nを得ることとされている"}, {"id": 37, "text": "議会の開会中においては、議長が議長の職を辞する場合及び副議長が副議長の職を辞する場合のいずれの場合も、議会の許可を得なければならない。", "answer": true, "explain": "議長が辞める時\n議会閉会中⇒議長の許可\nを得ることとされている"}, {"id": 38, "text": "議会に置かれた常任委員会は、議会の議決により付議された特定の事件については、議会の閉会中であっても、これを審査することが認められている。", "answer": true, "explain": "委員会（常任、特別、議会運営）は、議会の閉会中も特定の事件を継続して審査できる。"}, {"id": 39, "text": "地方自治法の規定により、議会の議員は、主として当該市町村に対し請負をする法人の取締役となることができないものとされており、この規定に該当したときは、議員の職を失うこととされている。", "answer": true, "explain": "議員は当該市町村に対し、請負をする法人の取締役となることが禁止されている。\n該当したときは議員の職を失う。\n他の指定都市に対し、請負をすること、及び取締役となることは禁止されていない。"}, {"id": 40, "text": "常任委員会及び特別委員会のいずれも、議会の閉会中において議会の議決により付議された特定の事件を継続して審査することが認められているのに対し、議会運営委員会は、議会の閉会中において審査することは認められていない。", "answer": false, "explain": "委員会（常任、特別、議会運営）は、議会の閉会中も特定の事件を継続して審査できる。"}, {"id": 41, "text": "議会に置かれた常任委員会及び特別委員会のいずれも、議会の議決により付議された特定の事件については、議会の閉会中であっても、これを審査することが認められている。", "answer": true, "explain": "委員会（常任、特別、議会運営）は、議会の閉会中も特定の事件を継続して審査できる。"}, {"id": 42, "text": "議会の開会中においては、議長が議長の職を辞する場合及び副議長が副議長の職を辞する場合のいずれの場合も、議会の許可を得なければならない。", "answer": true, "explain": "議長が辞める時\n議会閉会中⇒議長の許可\nを得ることとされている\n\n副議長が辞める時\n議会開会中⇒議会の許可\n議会閉会中⇒議長の許可\nを得ることとされている"}, {"id": 43, "text": "常任委員会、特別委員会及び議会運営委員会のいずれも、議会の議決により付議された特定の事件については、議会の閉会中もこれを審査することが認められている。", "answer": true, "explain": "委員会（常任、特別、議会運営）は、議会の閉会中も特定の事件を継続して審査できる。"}, {"id": 44, "text": "議員は、当該指定都市に対し請負をすること及び主として当該指定都市に対し請負をする法人の取締役となることはいずれも禁止されているが、他の指定都市に対し請負をすること及び主として他の指定都市に対して請負をする法人の取締役となることはいずれも禁止されていない。", "answer": true, "explain": "議員は当該市町村に対し、請負をする法人の取締役となることが禁止されている。\n該当したときは議員の職を失う。\n他の指定都市に対し、請負をすること、及び取締役となることは禁止されていない。"}, {"id": 45, "text": "議会は、当該市町村の公益に関する事件に係る意見書を、当該意見書の内容について権限を有する関係行政庁に提出することはできるが、国会に提出することはできない。", "answer": false, "explain": "議会は意見書を国会又は関係行政庁に提出することができる"}, {"id": 46, "text": "議会は、当該指定都市の公益に関する事件について、国会及び関係行政庁のいずれに対しても、意見書を提出することができる。", "answer": true, "explain": "議会は意見書を国会又は関係行政庁に提出することができる"}, {"id": 47, "text": "議会は、定例会及び臨時会に分けられ、このうち定例会については、市町村長があらかじめ会期を定めた上で、毎年条例で定める回数、招集しなければならないとされている。", "answer": false, "explain": "議会の会期、延長、開閉に関することは議会が定める。\n定例会の招集は市長。回数は市長が条例で定める。"}, {"id": 48, "text": "議会の議事については、法律に特別の定めがある場合を除き、出席議員の過半数で決することとされており、議長及び副議長は議員として議決に加わる権利を有しない。", "answer": false, "explain": "議長は議決加わることができない。\n副議長は加わることができる。"}, {"id": 49, "text": "議会の議員が、父母又は子の一身上に関する事件について、その議事に参与することは認められていないが、兄弟姉妹の一身上に関する事件について、その議事に参与することは認められている。", "answer": false, "explain": "議員は、自己または親族に関する議事及び直接利害関係にある事件には参与できない。"}, {"id": 50, "text": "議会に請願しようとする者は議員の紹介により請願書を提出しなければならず、議会は、その採択した請願で当該市町村の長において措置することが適当と認めるものについては、当該市町村の長にその請願を送付し、かつ、その請願の処理の経過及び結果の報告を請求することが認められている。", "answer": true, "explain": "請願について\n・議員の紹介により提出する。\n・議会が採択した請願は、関係の執行機関に送付し、その処理の経過及び結果を求めることができる。"}, {"id": 51, "text": "議会の会議は、原則として公開されるが、議長又は議長以外の議員3人以上の発議により、出席議員の過半数で議決したときは、秘密会を開くことができる。", "answer": false, "explain": "秘密会\n議長又は、議長以外の議員3人以上の発議により、出席議員の3分の2以上で議決した時は、秘密会を開くことができる。"}, {"id": 52, "text": "議会の議事については、法律に特別の定めがある場合を除き、議長を除く出席議員の過半数でこれを決し、可否同数のときは議長がこれを決することとされている。", "answer": true, "explain": "議会の議事は、議長を除く、出席議員の過半数で決する。\n可否同数の時は議長がこれを決する。"}, {"id": 53, "text": "議会の議員は、自己の一身上に関する事件、及び自己の従事する業務に直接利害関係のある事件のいずれについても、一定の場合を除き、その議事に参与することは認められていない。", "answer": true, "explain": "議員は、自己または親族に関する議事及び直接利害関係にある事件には参与できない。"}, {"id": 54, "text": "臨時会の招集については、市町村長がこれを行うこととされており、招集する臨時会の会期についても、当該市町村長がこれを定めることとされている。", "answer": false, "explain": "議会の会期、延長、開閉に関することは議会が定める。\n定例会の招集は市長。回数は市長が条例で定める。"}, {"id": 55, "text": "議会の議事については、法律に特別の定めがある場合を除き、出席議員の過半数でこれを決することとされており、議会の議事を出席議員の過半数で決する場合は、議長は議員として議決に加わることができる。", "answer": false, "explain": "議長は議決加わることができない。\n副議長は加わることができる。"}, {"id": 56, "text": "議会は、直接請求としての議会の解散の請求に係る解散の投票において過半数の同意があった場合、及び議会において議員数の４分の３以上の者が出席し、その５分の４以上の者の同意により議会の解散の議決がなされた場合のいずれの場合も、解散するものとされている。", "answer": true, "explain": "議会の解散\n・投票において過半数の同意があったとき\n・議員の4分の3以上が出席し、その5分の4以上の同意により解散の議決がなされたとき"}, {"id": 57, "text": "議会に請願しようとする者は議員の紹介により請願書を提出しなければならず、議会は、その採択した請願で当該指定都市の長において措置することが適当と認めるものについては、当該指定都市の長にその請願を送付し、かつ、その請願の処理の経過及び結果の報告を請求することが認められている。", "answer": true, "explain": "請願について\n・議員の紹介により提出する。\n・議会が採択した請願は、関係の執行機関に送付し、その処理の経過及び結果を求めることができる。"}, {"id": 58, "text": "議会の議事については、法律に特別の定めがある場合を除き、議長を除く出席議員の過半数でこれを決するが、可否同数のときは議長がこれを決することとされている。", "answer": true, "explain": "議会の議事は、議長を除く、出席議員の過半数で決する。\n可否同数の時は議長がこれを決する。"}, {"id": 59, "text": "議会の会議は、原則として公開するものとされているが、議長又は議長以外の議員３人以上の発議により、出席議員の３分の２以上の多数で議決したときは、秘密会を開くことができる。", "answer": true, "explain": "秘密会\n議長又は、議長以外の議員3人以上の発議により、出席議員の3分の2以上で議決した時は、秘密会を開くことができる。"}, {"id": 60, "text": "議会の定例会については、市町村長が、毎年、条例で定める回数これを招集することとされており、招集された定例会の会期については、議会がこれを定めることとされている。", "answer": true, "explain": "議会の会期、延長、開閉に関することは議会が定める。\n定例会の招集は市長。回数は市長が条例で定める。"}, {"id": 61, "text": "議長は、議会運営委員会の議決を経て、市町村長に対し、会議に付議すべき事件を示して臨時会の招集の請求をすることができ、市町村長は、当該請求があったときは、一定期間内に臨時会を招集しなければならない。", "answer": true, "explain": "臨時会\n・議長は臨時会の招集を請求することができる\n・長は、請求があったとき、一定期間に内に臨時会を招集しなければならない"}, {"id": 62, "text": "議員に対する懲罰のうち、除名の動議を議題とするに当たっては、議員の定数の８分の１以上の者の発議によることとされており、公開の議場における戒告の動議を議題とするに当たっては、議員の定数の12分の１以上の者の発議によることとされている。", "answer": false, "explain": "議員の懲罰\n・除名：議員の3分の2以上が出席し、4分の3以上の同意が必要\n・懲罰を議題とするには：議員定数の8分の1以上の発議"}, {"id": 63, "text": "事務局を置く議会において、議長は、事務局長に書面又は電磁的記録により会議録を作成させなければならず、当該会議録には、会議の次第及び出席議員の氏名を記載又は記録させなければならない。", "answer": true, "explain": "事務局を置く議会\n・議長は事務局長に、書面又は、電磁的記録により会議録を作成させなければならない。\n・会議の結果を市長に報告する。"}, {"id": 64, "text": "議員は、自己の従事する業務に直接の利害関係のある事件、及び兄弟姉妹の一身上に関する事件のいずれの事件についても、その議決に加わることは認められていない。", "answer": true, "explain": "議員は、自己または親族に関する議事及び直接利害関係にある事件には参与できない。"}, {"id": 65, "text": "議会の会議中、地方自治法又は会議規則に違反し、その他議場の秩序を乱す議員があるときは、議長は、これを制止し、又は発言の取消しを命じることができるほか、その命令に従わないときは、その日の会議が終わるまで発言を禁止し、又は当該議員を議場の外に退去させることができる。", "answer": true, "explain": "議長は場を乱す議員に対して退場、発言の禁止を命じることができる"}, {"id": 66, "text": "議会の定例会及び臨時会のいずれについても、市長が招集することとされているが、臨時会の招集については、市長はあらかじめこれを告示しなければならないのに対し、定例会の招集については、市長はこれを告示する必要はない。", "answer": false, "explain": "定例会の招集については、7日までにその旨を告示しなければならない"}, {"id": 67, "text": "事務局を置く議会の議長は、事務局長をして会議録を調製し、会議の次第及び出席議員の氏名を記載させることとされているほか、当該会議録の写を添えて当該会議の結果を市長に報告することとされている。", "answer": true, "explain": "事務局を置く議会\n・議長は事務局長に、書面又は、電磁的記録により会議録を作成させなければならない。\n・会議の結果を市長に報告する。"}, {"id": 68, "text": "議長は、議会の会議中に議場の秩序を乱す議員があり、これを制止したにもかかわらず、この命令に当該議員が従わないため、当該議員を議場の外に退去させようとするときは、議会の議決を経なければならない。", "answer": false, "explain": "議長は場を乱す議員に対して退場、発言の禁止を命じることができる"}, {"id": 69, "text": "定例会については、年4回以内において条例で定める回数を市長が招集することとされており、臨時会については、必要がある場合においてその事件に限り市長が招集することとされている。", "answer": false, "explain": "定例会は毎年条例で定める回数市長が招集する。×年4回以内ではない。"}, {"id": 70, "text": "議会は、委員会に関する条例に違反した議員及び会議規則に違反した議員のいずれに対しても、議決により、公開の議場における戒告、公開の議場における陳謝、一定期間の出席停止又は除名の懲罰を科することが認められている。", "answer": true, "explain": "議会は、条例、会議規則に違反した議員に対して\n・戒告、陳謝、出席停止、除名の懲罰を科すことができる。"}];
+
+    const WRONG_KEY = "mxquiz_wrong_v1";
+    const RESULT_KEY = "mxquiz_result_v1";
+
+    const $ = (id)=>document.getElementById(id);
+    const $setup=$('setup'), $quiz=$('quiz');
+    const $btnStart=$('btnStart'), $btnExit=$('btnExit');
+    const $optShuffle=$('optShuffle'), $optWrongOnly=$('optWrongOnly'), $btnClear=$('btnClear');
+    const $len=$('len'), $total=$('total'), $idx=$('idx'), $ok=$('ok'), $ng=$('ng'), $bar=$('bar');
+    const $qtext=$('qtext'), $btnTrue=$('btnTrue'), $btnFalse=$('btnFalse');
+    const $result=$('result'), $explainWrap=$('explainWrap');
+    const $btnPrev=$('btnPrev'), $btnNext=$('btnNext'), $btnMarkWrong=$('btnMarkWrong');
+
+    let wrongSet = new Set(JSON.parse(localStorage.getItem(WRONG_KEY) || "[]"));
+    let quiz = { order: [], i: 0, picked: null, ok: 0, ng: 0, locked: false };
+
+    function updateHeaderCounts(){ document.getElementById('len').textContent = DATA.length; }
+    updateHeaderCounts();
+
+    function startQuiz(){
+      let pool = DATA.slice();
+      if ($optWrongOnly.checked){
+        pool = pool.filter(x=> wrongSet.has(x.id));
+        if (!pool.length){ alert('間違えた問題がありません'); return; }
+      }
+      if ($optShuffle.checked){
+        for(let i=pool.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [pool[i],pool[j]]=[pool[j],pool[i]]; }
+      }
+      quiz = { order: pool.map(x=>x.id), i:0, picked:null, ok:0, ng:0, locked:false };
+      $setup.style.display='none'; $quiz.style.display='block';
+      render();
+    }
+    function exitQuiz(){ $quiz.style.display='none'; $setup.style.display='block'; }
+
+    function cur(){ const id=quiz.order[quiz.i]; return DATA.find(x=>x.id===id); }
+
+    function setSelected(which){
+      $btnTrue.classList.toggle('selected', which==='true');
+      $btnFalse.classList.toggle('selected', which==='false');
+    }
+
+    function render(){
+      const item = cur();
+      $idx.textContent = quiz.i + 1;
+      $total.textContent = quiz.order.length;
+      $ok.textContent = quiz.ok; $ng.textContent = quiz.ng;
+      $bar.style.width = Math.round((quiz.i/Math.max(1,quiz.order.length))*100) + '%';
+      $qtext.textContent = item.text;
+
+      setSelected(null);
+      $result.style.display='none';
+      $explainWrap.style.display='none';
+      $explainWrap.textContent = item.explain || '';
+      $btnTrue.disabled = false;
+      $btnFalse.disabled = false;
+
+      // Mark button style reflects current state
+      $btnMarkWrong.classList.toggle('marked', wrongSet.has(item.id));
+
+      quiz.picked = null;
+      quiz.locked = false;
+    }
+
+    function grade(pickedBool){
+      if (quiz.locked) return;
+      const item = cur();
+      quiz.picked = pickedBool;
+      const ok = pickedBool === item.answer;
+
+      if (ok) quiz.ok++;
+      else { quiz.ng++; wrongSet.add(item.id); persistWrong(); }
+      persistResult();
+
+      $result.textContent = ok? '正解！':'不正解';
+      $result.className = 'result ' + (ok? 'ok':'ng');
+      $result.style.display = 'block';
+      $explainWrap.style.display = 'block';
+
+      setSelected(pickedBool ? 'true' : 'false');
+      $btnTrue.disabled = true;
+      $btnFalse.disabled = true;
+      quiz.locked = true;
+
+      // Update mark button style after grading (in case it changed via auto-add on wrong)
+      $btnMarkWrong.classList.toggle('marked', wrongSet.has(item.id));
+    }
+
+    function persistWrong(){
+      localStorage.setItem(WRONG_KEY, JSON.stringify(Array.from(wrongSet)));
+    }
+    function persistResult(){
+      localStorage.setItem(RESULT_KEY, JSON.stringify({ts:Date.now(), ok:quiz.ok, ng:quiz.ng}));
+    }
+
+    // Toggle: add/remove from wrongSet with visual state
+    $btnMarkWrong.onclick = ()=>{
+      const item = cur();
+      if (wrongSet.has(item.id)){
+        wrongSet.delete(item.id);
+      } else {
+        wrongSet.add(item.id);
+      }
+      persistWrong();
+      $btnMarkWrong.classList.toggle('marked', wrongSet.has(item.id));
+    };
+
+    $btnTrue.onclick = ()=> grade(true);
+    $btnFalse.onclick = ()=> grade(false);
+
+    $btnPrev.onclick=()=>{ if (quiz.i>0){ quiz.i--; render(); } };
+    $btnNext.onclick=()=>{ if (quiz.i<quiz.order.length-1){ quiz.i++; render(); } else { alert('最後の問題です'); } };
+
+    $btnStart.onclick=startQuiz;
+    $btnExit.onclick=exitQuiz;
+    $btnClear.onclick=()=>{ if(confirm('履歴（間違えた問題）を消去しますか？')){ wrongSet = new Set(); persistWrong(); alert('消去しました'); } };
+  </script>
+</body>
+</html>
